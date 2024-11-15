@@ -60,11 +60,12 @@ type ClaimRole struct {
 
 // JWTClaims holds data stored in a JWT access token with additional Justice Flags field
 type JWTClaims struct {
-	OrganizationID string      `json:"organizationId"`
-	DisplayName    string      `json:"display_name"`
-	Roles          []ClaimRole `json:"roles"`
-	Scope          string      `json:"scope"`
-	ClientID       string      `json:"client_id"`
+	OrganizationID string       `json:"organizationId"`
+	DisplayName    string       `json:"display_name"`
+	Roles          []ClaimRole  `json:"roles"`
+	Scope          string       `json:"scope"`
+	ClientID       string       `json:"client_id"`
+	Permissions    []Permission `json:"permissions"`
 	jwt.Claims
 }
 

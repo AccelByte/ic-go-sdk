@@ -114,19 +114,32 @@ func (client *DefaultClient) ValidateAndParseClaims(accessToken string) (*JWTCla
 	return claim, nil
 }
 
-func (client *DefaultClient) ValidatePermission(claims *JWTClaims, requiredPermission Permission,
-	permissionResources map[string]string) (bool, error) {
-	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.ValidatePermission")
-	defer jaeger.Finish(span)
-
+func (client *DefaultClient) ValidatePermission(
+	claims *JWTClaims,
+	requiredPermission Permission,
+	permissionResources map[string]string,
+) (bool, error) {
 	if claims == nil {
 		log("ValidatePermission: claim is nil")
 		return false, nil
 	}
+
+	span, _ := jaeger.StartSpanFromContext(context.TODO(), "client.ValidatePermission")
+	defer jaeger.Finish(span)
+
 	for placeholder, value := range permissionResources {
 		requiredPermission.Resource = strings.Replace(requiredPermission.Resource, placeholder, value, 1)
 	}
+
+	// if the request is coming from a client (i.e. no claims.sub), we want to check using the client's permissions and
+	// organizationID
+	if claims.Subject == "" {
+		ownedPermissions := client.applyUserPermissionResourceValues(claims.Permissions, claims, claims.OrganizationID, "")
+		if client.permissionAllowed(ownedPermissions, requiredPermission) {
+			return true, nil
+		}
+	}
+
 	for _, role := range claims.Roles {
 		rolePermission, err := client.GetRolePermissions(role.RoleID)
 		if err != nil {
@@ -137,6 +150,7 @@ func (client *DefaultClient) ValidatePermission(claims *JWTClaims, requiredPermi
 			return true, nil
 		}
 	}
+
 	return false, nil
 }
 
