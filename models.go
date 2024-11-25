@@ -43,9 +43,10 @@ type Permission struct {
 }
 
 type ClientInformation struct {
-	ClientName  string `json:"clientName"`
-	RedirectURI string `json:"redirectUri"`
-	BaseURI     string `json:"baseUri"`
+	ClientName     string `json:"clientName"`
+	RedirectURI    string `json:"redirectUri"`
+	BaseURI        string `json:"baseUri"`
+	OrganizationID string `json:"organizationId"`
 }
 
 type Role struct {
