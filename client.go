@@ -36,7 +36,7 @@ type Client interface {
 }
 
 type Options struct {
-	jaegerCtx context.Context
+	traceCtx context.Context
 }
 
 type Option func(*Options)

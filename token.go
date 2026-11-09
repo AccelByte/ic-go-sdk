@@ -17,7 +17,7 @@ package ic
 import (
 	"bytes"
 	"github.com/AccelByte/go-jose/jwt"
-	"github.com/AccelByte/go-restful-plugins/v3/pkg/jaeger"
+	"github.com/AccelByte/ic-go-sdk/internal/tracing"
 	"github.com/cenkalti/backoff"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
@@ -28,15 +28,15 @@ import (
 
 // nolint: funlen
 func (client *DefaultClient) validateAccessToken(accessToken string, rootSpan opentracing.Span) (bool, error) {
-	span := jaeger.StartChildSpan(rootSpan, "client.validateAccessToken")
-	defer jaeger.Finish(span)
+	span := tracing.StartChildSpan(rootSpan, "client.validateAccessToken")
+	defer tracing.Finish(span)
 
 	form := url.Values{}
 	form.Add("token", accessToken)
 
 	req, err := http.NewRequest(http.MethodPost, client.config.BaseURL+verifyPath, bytes.NewBufferString(form.Encode()))
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "validateAccessToken: unable to create new HTTP request"))
+		tracing.TraceError(span, errors.Wrap(err, "validateAccessToken: unable to create new HTTP request"))
 		return false, errors.Wrap(err, "validateAccessToken: unable to create new HTTP request")
 	}
 
@@ -51,22 +51,22 @@ func (client *DefaultClient) validateAccessToken(accessToken string, rootSpan op
 	err = backoff.
 		Retry(
 			func() error {
-				reqSpan := jaeger.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
-				defer jaeger.Finish(reqSpan)
-				jErr := jaeger.InjectSpanIntoRequest(reqSpan, req)
+				reqSpan := tracing.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
+				defer tracing.Finish(reqSpan)
+				jErr := tracing.InjectSpanIntoRequest(reqSpan, req)
 				if jErr != nil {
 					logrus.Warn(jErr)
 				}
 				resp, e := client.httpClient.Do(req)
 				if e != nil {
-					jaeger.TraceError(reqSpan, e)
+					tracing.TraceError(reqSpan, e)
 					return backoff.Permanent(e)
 				}
 				defer resp.Body.Close()
 
 				responseStatusCode = resp.StatusCode
 				if resp.StatusCode >= http.StatusInternalServerError {
-					jaeger.TraceError(
+					tracing.TraceError(
 						reqSpan,
 						errors.Errorf(
 							"validateAccessToken: endpoint returned status code : %v",
@@ -83,12 +83,12 @@ func (client *DefaultClient) validateAccessToken(accessToken string, rootSpan op
 		)
 
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "validateAccessToken: unable to do HTTP request"))
+		tracing.TraceError(span, errors.Wrap(err, "validateAccessToken: unable to do HTTP request"))
 		return false, errors.Wrap(err, "validateAccessToken: unable to do HTTP request")
 	}
 
 	if responseStatusCode == http.StatusUnauthorized {
-		jaeger.TraceError(span, errors.Wrap(errUnauthorized, "validateAccessToken: unauthorized"))
+		tracing.TraceError(span, errors.Wrap(errUnauthorized, "validateAccessToken: unauthorized"))
 		return false, errors.Wrap(errUnauthorized, "validateAccessToken: unauthorized")
 	}
 
@@ -101,8 +101,8 @@ func (client *DefaultClient) validateAccessToken(accessToken string, rootSpan op
 }
 
 func (client *DefaultClient) validateJWT(token string, rootSpan opentracing.Span) (*JWTClaims, error) {
-	span := jaeger.StartChildSpan(rootSpan, "client.validateJWT")
-	defer jaeger.Finish(span)
+	span := tracing.StartChildSpan(rootSpan, "client.validateJWT")
+	defer tracing.Finish(span)
 
 	if token == "" {
 		return nil, errors.WithMessage(errEmptyToken, "validateJWT: invalid token")
