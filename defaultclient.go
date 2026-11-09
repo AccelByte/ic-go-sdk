@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AccelByte/go-restful-plugins/v3/pkg/jaeger"
+	"github.com/AccelByte/ic-go-sdk/internal/tracing"
 	"github.com/bluele/gcache"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
@@ -90,26 +90,26 @@ func NewDefaultClient(config *Config) *DefaultClient {
 
 func (client *DefaultClient) ValidateAccessToken(accessToken string) (bool, error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.ValidateAccessToken")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.ValidateAccessToken")
+	defer tracing.Finish(span)
 	return client.validateAccessToken(accessToken, span)
 }
 
 func (client *DefaultClient) ValidateAndParseClaims(accessToken string) (*JWTClaims, error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.ValidateAndParseClaims")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.ValidateAndParseClaims")
+	defer tracing.Finish(span)
 
 	claim, err := client.validateJWT(accessToken, span)
 	if err != nil {
 		if err == errTokenExpired {
-			jaeger.TraceError(span, err)
+			tracing.TraceError(span, err)
 			return nil, err
 		}
 		err = logAndReturnErr(
 			errors.WithMessage(err,
 				"ValidateAndParseClaims: unable to validate JWT"))
-		jaeger.TraceError(span, err)
+		tracing.TraceError(span, err)
 		return nil, err
 	}
 	return claim, nil
@@ -118,8 +118,8 @@ func (client *DefaultClient) ValidateAndParseClaims(accessToken string) (*JWTCla
 func (client *DefaultClient) ValidatePermission(claims *JWTClaims, requiredPermission Permission,
 	permissionResources map[string]string) (bool, error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.ValidatePermission")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.ValidatePermission")
+	defer tracing.Finish(span)
 
 	if claims == nil {
 		log("ValidatePermission: claim is nil")
@@ -148,8 +148,8 @@ func (client *DefaultClient) ValidatePermission(claims *JWTClaims, requiredPermi
 
 func (client *DefaultClient) ClientToken() (string, error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.ClientToken")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.ClientToken")
+	defer tracing.Finish(span)
 
 	token, err := client.clientAccessToken.Get("")
 	if err != nil {
@@ -160,8 +160,8 @@ func (client *DefaultClient) ClientToken() (string, error) {
 
 func (client *DefaultClient) GetClientInformation(clientID string) (*ClientInformation, error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.GetClientInformation")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.GetClientInformation")
+	defer tracing.Finish(span)
 
 	clientInfo, err := client.clientInfoCache.Get(clientID)
 	if err != nil {
@@ -173,8 +173,8 @@ func (client *DefaultClient) GetClientInformation(clientID string) (*ClientInfor
 
 func (client *DefaultClient) GetRolePermissions(roleID string) (perms []Permission, err error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.GetRolePermissions")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.GetRolePermissions")
+	defer tracing.Finish(span)
 
 	roleInfo, err := client.roleInfoCache.Get(roleID)
 	if err != nil {
@@ -186,8 +186,8 @@ func (client *DefaultClient) GetRolePermissions(roleID string) (perms []Permissi
 
 func (client *DefaultClient) GetKeys() (keys map[string]*rsa.PublicKey, err error) {
 	options := context.TODO()
-	span, _ := jaeger.StartSpanFromContext(options, "client.GetKeys")
-	defer jaeger.Finish(span)
+	span, _ := tracing.StartSpanFromContext(options, "client.GetKeys")
+	defer tracing.Finish(span)
 
 	keysV, err := client.keysCache.Get("")
 	if err != nil {

@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/AccelByte/go-restful-plugins/v3/pkg/jaeger"
+	"github.com/AccelByte/ic-go-sdk/internal/tracing"
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -38,9 +38,9 @@ const (
 
 func (client *DefaultClient) fetchClientInformation(clientID string, opts ...Option) (clientInfo *ClientInformation, err error) {
 	options := processOptions(opts)
-	span, _ := jaeger.StartSpanFromContext(options.jaegerCtx, "client.fetchClientInformation")
+	span, _ := tracing.StartSpanFromContext(options.traceCtx, "client.fetchClientInformation")
 
-	defer jaeger.Finish(span)
+	defer tracing.Finish(span)
 
 	getClientInformationURL := client.config.BaseURL + fmt.Sprintf(clientInformationPath, clientID)
 	req, err := http.NewRequest(http.MethodGet, getClientInformationURL, nil)
@@ -68,9 +68,9 @@ func (client *DefaultClient) fetchClientInformation(clientID string, opts ...Opt
 				}
 				req.Header.Set("Authorization", "Bearer "+clientToken)
 
-				reqSpan := jaeger.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
-				defer jaeger.Finish(reqSpan)
-				jErr := jaeger.InjectSpanIntoRequest(reqSpan, req)
+				reqSpan := tracing.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
+				defer tracing.Finish(reqSpan)
+				jErr := tracing.InjectSpanIntoRequest(reqSpan, req)
 				if jErr != nil {
 					logrus.Warn(jErr)
 				}
@@ -83,16 +83,16 @@ func (client *DefaultClient) fetchClientInformation(clientID string, opts ...Opt
 
 				responseStatusCode = resp.StatusCode
 				if resp.StatusCode >= http.StatusInternalServerError {
-					jaeger.TraceError(reqSpan, fmt.Errorf("StatusCode: %v", resp.StatusCode))
+					tracing.TraceError(reqSpan, fmt.Errorf("StatusCode: %v", resp.StatusCode))
 					return errors.Errorf("getClientInformation: endpoint returned status code : %v", responseStatusCode)
 				} else if resp.StatusCode == http.StatusUnauthorized {
-					jaeger.TraceError(span, errors.Wrap(errUnauthorized, "getClientInformation: unauthorized"))
+					tracing.TraceError(span, errors.Wrap(errUnauthorized, "getClientInformation: unauthorized"))
 					return errors.Wrap(errUnauthorized, "getClientInformation: unauthorized")
 				}
 
 				responseBodyBytes, e = ioutil.ReadAll(resp.Body)
 				if e != nil {
-					jaeger.TraceError(reqSpan, fmt.Errorf("Body.ReadAll: %s", e))
+					tracing.TraceError(reqSpan, fmt.Errorf("Body.ReadAll: %s", e))
 					return errors.Wrap(e, "getClientInformation: unable to read body response")
 				}
 
@@ -102,12 +102,12 @@ func (client *DefaultClient) fetchClientInformation(clientID string, opts ...Opt
 		)
 
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "getClientInformation: unable to do HTTP request"))
+		tracing.TraceError(span, errors.Wrap(err, "getClientInformation: unable to do HTTP request"))
 		return nil, errors.Wrap(err, "getClientInformation: unable to do HTTP request")
 	}
 
 	if responseStatusCode != http.StatusOK {
-		jaeger.TraceError(span,
+		tracing.TraceError(span,
 			errors.Errorf(
 				"getClientInformation: unable to get client information: error code : %d, error message : %s",
 				responseStatusCode, string(responseBodyBytes)))
@@ -119,7 +119,7 @@ func (client *DefaultClient) fetchClientInformation(clientID string, opts ...Opt
 	var clientInformation ClientInformation
 	err = json.Unmarshal(responseBodyBytes, &clientInformation)
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "getClientInformation: unable to unmarshal response body"))
+		tracing.TraceError(span, errors.Wrap(err, "getClientInformation: unable to unmarshal response body"))
 		return nil, errors.Wrap(err, "getClientInformation: unable to unmarshal response body")
 	}
 
@@ -128,9 +128,9 @@ func (client *DefaultClient) fetchClientInformation(clientID string, opts ...Opt
 
 func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl *time.Duration, err error) {
 	options := processOptions(opts)
-	span, _ := jaeger.StartSpanFromContext(options.jaegerCtx, "client.ClientTokenGrant")
+	span, _ := tracing.StartSpanFromContext(options.traceCtx, "client.ClientTokenGrant")
 
-	defer jaeger.Finish(span)
+	defer tracing.Finish(span)
 
 	form := url.Values{}
 	form.Add("grant_type", "client_credentials")
@@ -141,7 +141,7 @@ func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl
 		bytes.NewBufferString(form.Encode()),
 	)
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "ClientTokenGrant: unable to create new HTTP request"))
+		tracing.TraceError(span, errors.Wrap(err, "ClientTokenGrant: unable to create new HTTP request"))
 		return "", nil, errors.Wrap(err, "ClientTokenGrant: unable to create new HTTP request")
 	}
 
@@ -158,9 +158,9 @@ func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl
 	err = backoff.
 		Retry(
 			func() error {
-				reqSpan := jaeger.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
-				defer jaeger.Finish(reqSpan)
-				jErr := jaeger.InjectSpanIntoRequest(reqSpan, req)
+				reqSpan := tracing.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
+				defer tracing.Finish(reqSpan)
+				jErr := tracing.InjectSpanIntoRequest(reqSpan, req)
 				if jErr != nil {
 					logrus.Warn(jErr)
 				}
@@ -173,13 +173,13 @@ func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl
 
 				responseStatusCode = resp.StatusCode
 				if resp.StatusCode >= http.StatusInternalServerError {
-					jaeger.TraceError(reqSpan, fmt.Errorf("StatusCode: %v", resp.StatusCode))
+					tracing.TraceError(reqSpan, fmt.Errorf("StatusCode: %v", resp.StatusCode))
 					return errors.Errorf("ClientTokenGrant: endpoint returned status code : %v", responseStatusCode)
 				}
 
 				responseBodyBytes, e = ioutil.ReadAll(resp.Body)
 				if e != nil {
-					jaeger.TraceError(reqSpan, fmt.Errorf("Body.ReadAll: %s", e))
+					tracing.TraceError(reqSpan, fmt.Errorf("Body.ReadAll: %s", e))
 					return errors.Wrap(e, "ClientTokenGrant: unable to read response body")
 				}
 
@@ -189,12 +189,12 @@ func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl
 		)
 
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "ClientTokenGrant: unable to do HTTP request"))
+		tracing.TraceError(span, errors.Wrap(err, "ClientTokenGrant: unable to do HTTP request"))
 		return "", nil, errors.Wrap(err, "ClientTokenGrant: unable to do HTTP request")
 	}
 
 	if responseStatusCode != http.StatusOK {
-		jaeger.TraceError(
+		tracing.TraceError(
 			span,
 			errors.Errorf(
 				"ClientTokenGrant: unable to grant client token: error code : %d, error message : %s",
@@ -211,7 +211,7 @@ func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl
 
 	err = json.Unmarshal(responseBodyBytes, &tokenResponse)
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "clientDelegateTokenGrant: unable to unmarshal response body"))
+		tracing.TraceError(span, errors.Wrap(err, "clientDelegateTokenGrant: unable to unmarshal response body"))
 		return "", nil, errors.Wrap(err, "clientDelegateTokenGrant: unable to unmarshal response body")
 	}
 	refreshInterval := time.Duration(float64(tokenResponse.ExpiresIn)*defaultTokenRefreshRate) * time.Second
@@ -221,9 +221,9 @@ func (client *DefaultClient) ClientTokenGrant(opts ...Option) (token string, ttl
 // nolint: funlen, dupl
 func (client *DefaultClient) getRoleInfo(roleID string, opts ...Option) (*Role, error) {
 	options := processOptions(opts)
-	span, _ := jaeger.StartSpanFromContext(options.jaegerCtx, "client.getRoleInfo")
+	span, _ := tracing.StartSpanFromContext(options.traceCtx, "client.getRoleInfo")
 
-	defer jaeger.Finish(span)
+	defer tracing.Finish(span)
 
 	req, err := http.NewRequest("GET", client.config.BaseURL+fmt.Sprintf(getRolePath, roleID), nil)
 	if err != nil {
@@ -247,9 +247,9 @@ func (client *DefaultClient) getRoleInfo(roleID string, opts ...Option) (*Role, 
 	err = backoff.
 		Retry(
 			func() error {
-				reqSpan := jaeger.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
-				defer jaeger.Finish(reqSpan)
-				jErr := jaeger.InjectSpanIntoRequest(reqSpan, req)
+				reqSpan := tracing.StartChildSpan(span, "HTTP Request: "+req.Method+" "+req.URL.Path)
+				defer tracing.Finish(reqSpan)
+				jErr := tracing.InjectSpanIntoRequest(reqSpan, req)
 				if jErr != nil {
 					logrus.Warn(jErr)
 				}
@@ -262,13 +262,13 @@ func (client *DefaultClient) getRoleInfo(roleID string, opts ...Option) (*Role, 
 
 				responseStatusCode = resp.StatusCode
 				if resp.StatusCode >= http.StatusInternalServerError {
-					jaeger.TraceError(reqSpan, fmt.Errorf("StatusCode: %v", resp.StatusCode))
+					tracing.TraceError(reqSpan, fmt.Errorf("StatusCode: %v", resp.StatusCode))
 					return errors.Errorf("getRolePermission: endpoint returned status code : %v", responseStatusCode)
 				}
 
 				responseBodyBytes, e = ioutil.ReadAll(resp.Body)
 				if e != nil {
-					jaeger.TraceError(reqSpan, fmt.Errorf("Body.ReadAll: %s", e))
+					tracing.TraceError(reqSpan, fmt.Errorf("Body.ReadAll: %s", e))
 					return errors.Wrap(e, "getRolePermission: unable to read response body")
 				}
 
@@ -278,7 +278,7 @@ func (client *DefaultClient) getRoleInfo(roleID string, opts ...Option) (*Role, 
 		)
 
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "getRolePermission: unable to do HTTP request"))
+		tracing.TraceError(span, errors.Wrap(err, "getRolePermission: unable to do HTTP request"))
 		return nil, errors.Wrap(err, "getRolePermission: unable to do HTTP request")
 	}
 
@@ -286,16 +286,16 @@ func (client *DefaultClient) getRoleInfo(roleID string, opts ...Option) (*Role, 
 	case http.StatusOK:
 		// do nothing
 	case http.StatusUnauthorized:
-		jaeger.TraceError(span, errors.Wrap(errUnauthorized, "getRolePermission: unauthorized"))
+		tracing.TraceError(span, errors.Wrap(errUnauthorized, "getRolePermission: unauthorized"))
 		return nil, errors.Wrap(errUnauthorized, "getRolePermission: unauthorized")
 	case http.StatusForbidden:
-		jaeger.TraceError(span, errors.Wrap(errForbidden, "getRolePermission: forbidden"))
+		tracing.TraceError(span, errors.Wrap(errForbidden, "getRolePermission: forbidden"))
 		return nil, errors.Wrap(errForbidden, "getRolePermission: forbidden")
 	case http.StatusNotFound:
-		jaeger.TraceError(span, errors.Wrap(errRoleNotFound, "getRolePermission: not found"))
+		tracing.TraceError(span, errors.Wrap(errRoleNotFound, "getRolePermission: not found"))
 		return nil, errors.Wrap(errRoleNotFound, "getRolePermission: not found")
 	default:
-		jaeger.TraceError(span, errors.New("unexpected error: "+http.StatusText(responseStatusCode)))
+		tracing.TraceError(span, errors.New("unexpected error: "+http.StatusText(responseStatusCode)))
 		return nil, errors.New("unexpected error: " + http.StatusText(responseStatusCode))
 	}
 
@@ -303,7 +303,7 @@ func (client *DefaultClient) getRoleInfo(roleID string, opts ...Option) (*Role, 
 
 	err = json.Unmarshal(responseBodyBytes, &role)
 	if err != nil {
-		jaeger.TraceError(span, errors.Wrap(err, "getRolePermission: unable to unmarshal response body"))
+		tracing.TraceError(span, errors.Wrap(err, "getRolePermission: unable to unmarshal response body"))
 		return nil, errors.Wrap(err, "getRolePermission: unable to unmarshal response body")
 	}
 	return &role, nil
